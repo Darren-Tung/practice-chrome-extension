@@ -29,20 +29,26 @@ document.addEventListener('click', (e) => {
   }
 }, true);
 
-function createTextbox(x, y) {
-  textboxCounter++;
+function createTextbox(x, y, value = '', id = null) {
+  if (id === null) {
+    textboxCounter++;
+    id = textboxCounter;
+  } else {
+    textboxCounter = Math.max(textboxCounter, id);
+  }
   
-  // Create container
+  // Create container with fixed positioning relative to document
   const container = document.createElement('div');
   container.className = 'textbox-overlay-container';
   container.style.left = `${x}px`;
   container.style.top = `${y}px`;
-  container.dataset.textboxId = textboxCounter;
+  container.dataset.textboxId = id;
   
   // Create textbox
   const textbox = document.createElement('textarea');
   textbox.className = 'textbox-overlay-input';
   textbox.placeholder = 'Enter text here...';
+  textbox.value = value;
   
   // Create header with drag handle and close button
   const header = document.createElement('div');
@@ -55,7 +61,10 @@ function createTextbox(x, y) {
   const closeBtn = document.createElement('button');
   closeBtn.className = 'textbox-overlay-close';
   closeBtn.textContent = '×';
-  closeBtn.onclick = () => container.remove();
+  closeBtn.onclick = () => {
+    container.remove();
+    saveTextboxes();
+  };
   
   header.appendChild(dragHandle);
   header.appendChild(closeBtn);
@@ -67,10 +76,15 @@ function createTextbox(x, y) {
   // Make draggable
   makeDraggable(container, header);
   
-  // Focus the textbox
-  textbox.focus();
+  // Add input event listener for auto-save
+  textbox.addEventListener('input', saveTextboxes);
   
-  // Save to storage
+  // Focus the textbox only if it's newly created (no value)
+  if (!value) {
+    textbox.focus();
+  }
+  
+  // Save to storage immediately after creation
   saveTextboxes();
 }
 
@@ -127,48 +141,18 @@ function loadTextboxes() {
     const data = result[window.location.href];
     if (data && Array.isArray(data)) {
       data.forEach(item => {
-        textboxCounter++;
-        const container = document.createElement('div');
-        container.className = 'textbox-overlay-container';
-        container.style.left = item.left;
-        container.style.top = item.top;
-        container.dataset.textboxId = item.id;
-        
-        const textbox = document.createElement('textarea');
-        textbox.className = 'textbox-overlay-input';
-        textbox.value = item.value || '';
-        textbox.placeholder = 'Enter text here...';
-        
-        const header = document.createElement('div');
-        header.className = 'textbox-overlay-header';
-        
-        const dragHandle = document.createElement('div');
-        dragHandle.className = 'textbox-overlay-drag';
-        dragHandle.textContent = '⋮⋮';
-        
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'textbox-overlay-close';
-        closeBtn.textContent = '×';
-        closeBtn.onclick = () => {
-          container.remove();
-          saveTextboxes();
-        };
-        
-        header.appendChild(dragHandle);
-        header.appendChild(closeBtn);
-        container.appendChild(header);
-        container.appendChild(textbox);
-        document.body.appendChild(container);
-        
-        makeDraggable(container, header);
-        
-        textbox.addEventListener('input', saveTextboxes);
+        createTextbox(
+          parseInt(item.left),
+          parseInt(item.top),
+          item.value || '',
+          parseInt(item.id)
+        );
       });
     }
   });
 }
 
-// Auto-save on text change
+// Auto-save on text change (redundant now, but kept for safety)
 document.addEventListener('input', (e) => {
   if (e.target.classList.contains('textbox-overlay-input')) {
     saveTextboxes();
@@ -176,4 +160,8 @@ document.addEventListener('input', (e) => {
 });
 
 // Load existing textboxes on page load
-loadTextboxes();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', loadTextboxes);
+} else {
+  loadTextboxes();
+}
